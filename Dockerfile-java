@@ -1,0 +1,3 @@
+# Dockerfile-java
+FROM openjdk:11
+WORKDIR /app

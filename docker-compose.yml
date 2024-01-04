@@ -1,0 +1,39 @@
+# docker-compose.yml
+version: '3'
+services:
+  java:
+    build:
+      context: .
+      dockerfile: Dockerfile-java
+    stdin_open: true
+    tty: true
+  python:
+    build:
+      context: .
+      dockerfile: Dockerfile-python
+    stdin_open: true
+    tty: true
+  c:
+    build:
+      context: .
+      dockerfile: Dockerfile-c
+    stdin_open: true
+    tty: true
+  cpp:
+    build:
+      context: .
+      dockerfile: Dockerfile-cpp
+    stdin_open: true
+    tty: true
+  kotlin:
+    build:
+      context: .
+      dockerfile: Dockerfile-kotlin
+    stdin_open: true
+    tty: true
+  go:
+    build:
+      context: .
+      dockerfile: Dockerfile-go
+    stdin_open: true
+    tty: true
