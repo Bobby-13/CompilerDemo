@@ -1,5 +1,6 @@
-package com.example.CompilerDemo.Demo1;
+package com.example.CompilerDemo.DTO;
 
+import com.example.CompilerDemo.DTO.SupportedLanguageInfo;
 import lombok.*;
 
 import java.util.List;

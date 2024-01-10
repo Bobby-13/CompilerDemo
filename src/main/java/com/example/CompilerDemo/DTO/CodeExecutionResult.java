@@ -1,4 +1,4 @@
-package com.example.CompilerDemo.Demo1;
+package com.example.CompilerDemo.DTO;
 
 import lombok.*;
 

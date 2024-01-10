@@ -1,3 +1,0 @@
-# Dockerfile-c
-FROM gcc
-WORKDIR /app

@@ -1,10 +1,12 @@
-package com.example.CompilerDemo.Demo1;
+package com.example.CompilerDemo.Service;
+import com.example.CompilerDemo.DTO.CodeExecutionRequest;
+import com.example.CompilerDemo.DTO.CodeExecutionResult;
+import com.example.CompilerDemo.DTO.CodeFile;
+import com.example.CompilerDemo.Service.CodeFileManager;
+import com.example.CompilerDemo.Service.LanguageConstants;
 import org.springframework.stereotype.Service;
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -14,13 +16,6 @@ import java.util.concurrent.TimeUnit;
 public class CodeExecutionService {
 
     private final CodeFileManager codeFileManager;
-//    private final LanguageInfoService languageInfoService;
-
-//    public CodeExecutionService(CodeFileManager codeFileManager, LanguageInfoService languageInfoService) {
-//        this.codeFileManager = codeFileManager;
-//        this.languageInfoService = languageInfoService;
-//    }
-
         public CodeExecutionService(CodeFileManager codeFileManager) {
         this.codeFileManager = codeFileManager;
     }
@@ -30,23 +25,19 @@ public class CodeExecutionService {
         String code = request.getCode();
         String input = request.getInput();
 
-        // Validate the request
         validateRequest(language, code);
         System.out.println("AfterValidation");
-        // Create a code file
+
         CodeFile codeFile = codeFileManager.createCodeFile(language, code);
         System.out.println("code file :" + codeFile);
         CodeExecutionResult result = executeCode(language, codeFile, input);
 
         try {
             System.out.println("After code Execution result : " + result);
-//            String languageInfo = languageInfoService.getInfo(language);
-//            result.setInfo(languageInfo);
 
             return result;
         }
         finally {
-            // Remove the code file after execution
             codeFileManager.removeCodeFile(codeFile.getJobID(), language, result.getOutputExt());
         }
     }
@@ -101,10 +92,6 @@ public class CodeExecutionService {
                 executeCommand = "go";
                 executionArgs = new String[]{"run", codeFilePath};
                 break;
-            case "cs":
-                executeCommand = "mcs";
-                executionArgs = new String[]{"-out:" + Paths.get("outputs", jobID + ".exe"), codeFilePath};
-                break;
             default:
                 throw new UnsupportedOperationException("Language not supported: " + language);
         }
@@ -123,9 +110,8 @@ public class CodeExecutionService {
             Process compilationProcess = compilationProcessBuilder.start();
             compilationProcess.waitFor();
 
-            // Check if compilation was successful
             if (compilationProcess.exitValue() == 0) {
-                // Set execute permissions for the compiled binary
+
                 String chmodCommand = "chmod +x " + compiledBinaryPath;
                 Process chmodProcess = Runtime.getRuntime().exec(chmodCommand);
                 chmodProcess.waitFor();
@@ -223,25 +209,13 @@ public class CodeExecutionService {
                 case "cpp":
                 case "c":
                 case "py":
-                    return "";  // Python doesn't typically produce a compiled output file
-                case "cs":
-                    return ".exe";
+                    return "";
+
                 default:
                     throw new UnsupportedOperationException("Language not supported: " + language);
             }
         }
 
-
-    private void moveCompiledBinary(String compiledBinaryPath) throws IOException {
-        Path sourcePath = Paths.get(compiledBinaryPath);
-        Path targetPath = Paths.get("outputs", new File(compiledBinaryPath).getName());
-
-        // Ensure the target directory exists
-        Files.createDirectories(targetPath.getParent());
-
-        // Perform the move operation
-        Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-    }
 
         private String getOutputFilePath (String jobID, String outputExt){
             return Paths.get("outputs", jobID + "" + outputExt).toString();
