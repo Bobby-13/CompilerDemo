@@ -12,6 +12,8 @@ public class CodeExecutionResult {
     private String error;
     private String language;
     private String info;
-    private int exitCode;
+    private String exeTime;
     private String outputExt;
+    private String StorageCapacity;
+
 }

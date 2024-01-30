@@ -2,25 +2,22 @@ package com.example.CompilerDemo.Service;
 import com.example.CompilerDemo.DTO.CodeExecutionRequest;
 import com.example.CompilerDemo.DTO.CodeExecutionResult;
 import com.example.CompilerDemo.DTO.CodeFile;
-import com.example.CompilerDemo.Service.CodeFileManager;
-import com.example.CompilerDemo.Service.LanguageConstants;
 import org.springframework.stereotype.Service;
 import java.io.*;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class CodeExecutionService {
-
     private final CodeFileManager codeFileManager;
-        public CodeExecutionService(CodeFileManager codeFileManager) {
+
+    public CodeExecutionService(CodeFileManager codeFileManager) {
         this.codeFileManager = codeFileManager;
     }
-
-    public CodeExecutionResult runCode(CodeExecutionRequest request) throws Exception {
+    public CodeExecutionResult runCode(CodeExecutionRequest request , String id) throws Exception {
         String language = request.getLanguage();
         String code = request.getCode();
         String input = request.getInput();
@@ -28,7 +25,7 @@ public class CodeExecutionService {
         validateRequest(language, code);
         System.out.println("AfterValidation");
 
-        CodeFile codeFile = codeFileManager.createCodeFile(language, code);
+        CodeFile codeFile = codeFileManager.createCodeFile(language, code,id);
         System.out.println("code file :" + codeFile);
         CodeExecutionResult result = executeCode(language, codeFile, input);
 
@@ -95,6 +92,9 @@ public class CodeExecutionService {
             default:
                 throw new UnsupportedOperationException("Language not supported: " + language);
         }
+
+        long startTime = System.currentTimeMillis();
+        CodeExecutionResult result = new CodeExecutionResult();
         try {
             if(executeCommand.equals("g++") || executeCommand.equals("gcc")){
             String command = "chmod +x " + codeFilePath;
@@ -110,11 +110,38 @@ public class CodeExecutionService {
             Process compilationProcess = compilationProcessBuilder.start();
             compilationProcess.waitFor();
 
+                long compilationTime = System.currentTimeMillis() - startTime;
+                System.out.println("Compilation Time: " + compilationTime + " milliseconds");
+
+                // Measure storage capacity after compilation
+                Path compiledPath = Paths.get(getOutputFilePath(jobID, outputExt));
+                long compiledBinarySize = compiledPath.toFile().length();
+                System.out.println("Compiled Binary Size: " + compiledBinarySize + " bytes");
+
+                // Execute compiled code
+//                ProcessBuilder processBuilder1 = new ProcessBuilder(compiledBinaryPath.toString());
+//                Process process1 = processBuilder1.start();
+
+                // Existing code...
+//
+//                process1.waitFor();
+//                long endTime = System.currentTimeMillis(); // Measure end time
+//                long executionTime = endTime - startTime;
+//                System.out.println("Execution Time: " + executionTime + " milliseconds");
+
+                // Measure storage capacity after execution
+                long outputSize = compiledPath.toFile().length();
+                System.out.println("Output Size: " + outputSize + " bytes");
+                result.setStorageCapacity(outputSize+" Bytes");
             if (compilationProcess.exitValue() == 0) {
 
                 String chmodCommand = "chmod +x " + compiledBinaryPath;
                 Process chmodProcess = Runtime.getRuntime().exec(chmodCommand);
                 chmodProcess.waitFor();
+                long endTime = System.currentTimeMillis();
+                long executionTime = endTime - startTime;
+                result.setExeTime(executionTime+ " milliseconds");
+                System.out.println("Execution Time: " + executionTime + " milliseconds");
             } else {
                 throw new RuntimeException("Compilation failed");
             }
@@ -139,14 +166,8 @@ public class CodeExecutionService {
                 output.append(line).append("\n");
                 System.out.println("-->"+output);
             }
-
-                System.out.println("Code Executed :");
-
-            int exitCode = process1.exitValue();
-
-            CodeExecutionResult result = new CodeExecutionResult();
+            System.out.println("Code Executed :");
             result.setOutput(output.toString());
-            result.setExitCode(exitCode);
             result.setOutputExt(outputExt);
 
                 return result;
@@ -168,28 +189,44 @@ public class CodeExecutionService {
                         process.getOutputStream().close();
                     }
 
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                StringBuilder output = new StringBuilder();
 
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                    StringBuilder output = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        System.out.println("Output block : ");
-                        output.append(line).append("\n");
+                Thread timeoutThread = new Thread(() -> {
+                    try {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            System.out.println("Output block : ");
+                            output.append(line).append("\n");
+                            long outputSize = output.toString().getBytes().length;
+                            result.setStorageCapacity(outputSize+" Bytes");
+                        }
+                        process.waitFor();
+                        long endTime = System.currentTimeMillis();
+                        long executionTime = endTime - startTime;
+                        result.setExeTime(executionTime+ " milliseconds");
+
+                        System.out.println("Execution Time: " + executionTime + " milliseconds");
+
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        throw new RuntimeException("RunTime Exceeded");
                     }
-
-                    boolean finished = process.waitFor(30, TimeUnit.SECONDS);
-
-                    if (!finished) {
+                    if (process.isAlive()) {
+                        System.out.println("Process exceeded the timeout. Destroying...");
                         process.destroy();
-                        throw new RuntimeException("Code execution timed out.");
                     }
+                });
 
-                    int exitCode = process.exitValue();
-
-                    CodeExecutionResult result = new CodeExecutionResult();
+                timeoutThread.start();
+                timeoutThread.join(1 * 1000);
+                process.destroy();
                     result.setOutput(output.toString());
-                    result.setExitCode(exitCode);
-                    result.setOutputExt(outputExt);
+
+                    String k = codeFile.getFileName().replaceAll("\\.\\w+", "");
+
+                    result.setOutputExt(k);
 
                     return result;
             }
@@ -215,7 +252,6 @@ public class CodeExecutionService {
                     throw new UnsupportedOperationException("Language not supported: " + language);
             }
         }
-
 
         private String getOutputFilePath (String jobID, String outputExt){
             return Paths.get("outputs", jobID + "" + outputExt).toString();
